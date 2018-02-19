@@ -1,0 +1,32 @@
+## import the libraries
+import tweepy, codecs
+from textblob import TextBlob
+import csv,io
+
+## fill in your Twitter credentials 
+consumer_key = "XYhJIKHoOjqSQlN6lKHGUTPyz"
+consumer_secret = "2oBPWminOaWChuLU9T4eFcW5SE5nj0wgKTD6NSWRY8TGM6YKbL"
+access_token = "55470209-TwVM0w2DvQYxKUFsWsRhBD59ffEEpFxTkPpsbHM1h"
+access_token_secret = "y62sBAglIptaIQvd0293KGMtnE3IJGNFVwcfGemUhUymX"
+
+## let Tweepy set up an instance of the REST API
+auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+auth.set_access_token(access_token, access_token_secret)
+api = tweepy.API(auth)
+
+## fill in your search query and store your results in a variable
+results = api.search(q = "apple", lang = "en", result_type = "recent", count = 3000)
+##print(results)
+
+## use the codecs library to write the text of the Tweets to a .txt file
+file = codecs.open("google_tweet.txt", "w", "utf-8")
+
+for result in results:
+	file.write(result.text)
+	file.write("\n")
+	analysis=TextBlob(result.text)
+	sentiment_val = analysis.sentiment.polarity
+	print(analysis,sentiment_val)
+	
+file.close()
+
