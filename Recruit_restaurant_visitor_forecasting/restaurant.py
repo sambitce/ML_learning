@@ -9,9 +9,12 @@ from shapely.geometry import Point
 from shapely.wkt import loads
 import plotly.plotly as py
 from shapely.geometry import Polygon
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import make_scorer ,accuracy_score
 from sklearn.model_selection import GridSearchCV
+from sklearn import preprocessing
+from sklearn import tree 
+from sklearn.neighbors import KNeighborsClassifier
 
 def load_data(data_file_name):
     return pd.read_csv(data_file_name)
@@ -44,7 +47,7 @@ air_visit_data['Month'] = air_visit_data['visit_date'].dt.month
 #print(air_visit_data['Month'])
 #print("end")
 
-air_visit_data.hist(bins=50 , figsize=(100,15))
+air_visit_data.hist(bins=25 , figsize=(25,10))
 plt.show()
 
 air_visit_store_data = pd.merge(left=air_visit_data,
@@ -61,7 +64,7 @@ copy_air_visit_data_test = test_set.copy()
 #print(copy_air_visit_data_train.head())
 
 
-'''
+
 copy_air_visit_data_train.plot(kind="scatter" , x="latitude" , 
                               y="longitude",
                               alpha=0.4,
@@ -72,35 +75,45 @@ copy_air_visit_data_train.plot(kind="scatter" , x="latitude" ,
                               colorbar=True,
                               figsize=(13,10))
 
-plt.legend()
-plt.plot(copy_air_visit_data_train.visit_date,copy_air_visit_data_train.visitors)
-'''
-#plt.plot(copy_air_visit_data_train.groupby('visit_date')['visitors'].sum(),  )
-#fig, ax = plt.subplots(figsize=(15,7))
-#copy_air_visit_data_train.groupby('visit_date')['visitors'].sum().plot(ax=ax)
+
+
+fig, ax = plt.subplots(figsize=(15,7))
+copy_air_visit_data_train.groupby('visit_date')['visitors'].sum().plot(ax=ax)
 
 group_by_genre = copy_air_visit_data_train.groupby(['visit_date','air_genre_name']).sum()['visitors'].unstack()
 
 group_by_genre.plot(kind='line', stacked=True, figsize=[15,6], colormap='gist_rainbow')
 
-
-
-
-days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday', 'Sunday']
 months =['Jan' ,'Feb','Mar','Apr','May','Jun',
          'Jul','Aug','Sep','Oct','Nov','Dec']
-#copy_air_visit_data_train.groupby(copy_air_visit_data_train['visit_date'].dt.weekday_name)['visitors'].median().reindex(days).plot(kind='bar', stacked=True, figsize=[15,6], colormap='gist_rainbow')
+
+
+fig, ax = plt.subplots(figsize=(15,7))
+mean_month_visitors = copy_air_visit_data_train.groupby(copy_air_visit_data_train['Month'].astype('int').apply(lambda x: calendar.month_abbr[x]))['visitors'].median().reindex(months).plot(kind='bar' ,colormap='gist_rainbow',ax=ax )
+
+##(kind='bar',  figsize=[15,6], colormap='Greens')
+
+days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday', 'Sunday']
+
+
+fig, ax = plt.subplots(figsize=(15,7))
+mean_day_visitors = air_visit_data.groupby(air_visit_data['visit_date'].dt.weekday_name)['visitors'].median().reindex(days).plot(kind='bar', colormap='spring_r',ax=ax)
+
+
+### below plot alone is not working...group by is working ####
+#air_visit_data.groupby(air_visit_data['visit_date'].dt.weekday_name)['visitors'].median().reindex(days).plot(kind='bar', stacked=True, figsize=[15,6], colormap='gist_rainbow')
+
 
 #copy_air_visit_data_train.groupby(copy_air_visit_data_train['Month'].astype('int').apply(lambda x: calendar.month_abbr[x]))['visitors'].median().reindex(months).plot(kind='bar', stacked=True, figsize=[15,6], colormap='Greens')
 #group_by_month = copy_air_visit_data_train.groupby(copy_air_visit_data_train['Month'].astype('int').apply(lambda x: calendar.month_abbr[x]))['visitors'].median().reindex(months)
 #group_by_month.plot(kind='bar', stacked=True, figsize=[15,6], colormap='jet')
 
-print(GeoSeries([loads('POINT(1 2)'), loads('POINT(1.5 2.5)'), loads('POINT(2 3)')]))
+
 
 geometry = [Point(xy) for xy in zip(copy_air_visit_data_train['longitude'],
             copy_air_visit_data_train['latitude'])]
 gs = GeoSeries(geometry, index=copy_air_visit_data_train['air_store_id'])
-print(gs)
+
 gdf = gpd.GeoDataFrame(copy_air_visit_data_train,geometry=geometry)
 
 
@@ -114,9 +127,45 @@ copy_air_visit_store_data = pd.merge(left=copy_air_visit_data,
                                 left_on='air_store_id',
                                 right_on='air_store_id' )
 
-
+lbl = preprocessing.LabelEncoder()
+'''
 copy_air_visit_store_data=copy_air_visit_store_data.drop(['air_area_name'] ,axis=1)
 copy_air_visit_store_data=copy_air_visit_store_data.drop(['air_genre_name'] ,axis=1)
+'''
+
+copy_air_visit_store_data['visit_date'] = pd.to_datetime(copy_air_visit_store_data['visit_date'])
+
+copy_air_visit_store_data['Month'] = copy_air_visit_store_data['visit_date'].dt.month
+copy_air_visit_store_data['Day'] = copy_air_visit_store_data['visit_date'].dt.day
+copy_air_visit_store_data['WeekDay'] = copy_air_visit_store_data['visit_date'].dt.weekday
+copy_air_visit_store_data['WeekDay'] = copy_air_visit_store_data['visit_date'].dt.weekday
+copy_air_visit_store_data['lat_long'] = copy_air_visit_store_data['latitude'] + copy_air_visit_store_data['longitude']
+
+copy_air_visit_store_data['air_store_id'] = lbl.fit_transform(copy_air_visit_store_data['air_store_id'])
+
+copy_air_visit_store_data['visit_date'] = lbl.fit_transform(copy_air_visit_store_data['visit_date'])
+
+copy_air_visit_store_data['air_area_name'] = lbl.fit_transform(copy_air_visit_store_data['air_area_name'])
+
+copy_air_visit_store_data['air_genre_name'] = lbl.fit_transform(copy_air_visit_store_data['air_genre_name'])
+
+
+
+
+copy_air_visit_store_data.dropna(axis=0, how='all')
+
+print("copy_air_visit_store_data" , copy_air_visit_store_data)
+X_all =  copy_air_visit_store_data.drop(['visitors'],axis=1)
+
+Y_all = copy_air_visit_store_data['visitors'].values
+
+
+
+X_train, X_test,Y_train,Y_test = train_test_split(X_all,Y_all,test_size=0.20,random_state=23)
+
+
+
+'''  SGD algorithm 
 
 from sklearn import preprocessing
 
@@ -125,7 +174,7 @@ lbl = preprocessing.LabelEncoder()
 copy_air_visit_store_data['air_store_id'] = lbl.fit_transform(copy_air_visit_store_data['air_store_id'])
 
 copy_air_visit_store_data['visit_date'] = lbl.fit_transform(copy_air_visit_store_data['visit_date'])
-print(copy_air_visit_store_data)
+
 copy_air_visit_store_data.dropna(axis=0, how='all')
 
 train_set , test_set = create_train_test_data(copy_air_visit_store_data)
@@ -150,28 +199,32 @@ test_features = scaler.transform(test_features)
 
 clf = linear_model.SGDRegressor(loss= "squared_loss" ,average=True)
 
-fitted = clf.fit(train_set_features,train_set_labels)
+#fitted = clf.fit(train_set_features,train_set_labels)
 
-predicted = clf.predict(test_features)
+#predicted = clf.predict(test_features)
 
 
 
 # create file
 print('Generating submission file ...')
-results = pd.DataFrame({'Demanda_uni_equil': predicted}, dtype=int)
+#results = pd.DataFrame({'Demanda_uni_equil': predicted}, dtype=int)
 
 
         
 #Writting to csv
-results.to_csv('regressor.csv', index=True, header=True, index_label='id')
-
+#results.to_csv('regressor.csv', index=True, header=True, index_label='id')
+''' 
+#### END OF SGD algorithm #####
 
 ############Random Forest classifier ##############
 
 
-'''
-clf = RandomForestClassifier()
 
+model1 = RandomForestRegressor()
+model2=tree.DecisionTreeRegressor()
+model3=KNeighborsClassifier()
+
+'''
 parameters = {'n_estimators': [4, 6, 9], 
               'max_features': ['log2', 'sqrt','auto'], 
               'criterion': ['entropy', 'gini'],
@@ -179,24 +232,50 @@ parameters = {'n_estimators': [4, 6, 9],
               'min_samples_split': [2, 3, 5],
               'min_samples_leaf': [1,5,8]
              }
-
-acc_scorer = make_scorer(accuracy_score)
-
-grid_obj = GridSearchCV(clf,parameters, scoring=acc_scorer)
-
-grid_obj = grid_obj.fit(train_set_features,train_set_labels)
-
-clf = grid_obj.best_estimator_
-
-
-clf.fit(train_set_features,train_set_labels)
-
-
-
-
-predictions = clf.predict(test_features)
-print(accuracy_score(test_labels, predictions))
 '''
+#acc_scorer = make_scorer(accuracy_score)
+
+#grid_obj = GridSearchCV(clf,parameters, scoring=acc_scorer)
+
+#grid_obj = grid_obj.fit(train_set_features,train_set_labels)
+
+#clf = grid_obj.best_estimator_
+
+
+
+model2.fit(X_train,Y_train)
+
+predictions = model2.predict(X_test)
+
+#print("Accuracy score is" , accuracy_score(Y_test, predictions))
+
+from sklearn.metrics import mean_squared_error
+
+def RMSLE(y, pred):
+    return mean_squared_error(y, pred)**0.5
+
+def plot_actual_predicted(actual, predicted):
+    print('RMSE: ', RMSLE(actual, predicted))
+    print("actual",actual)
+    print("predicted",predicted)
+    tmp = pd.DataFrame({'actual': actual, 'predicted': predicted}).sort_values(['actual'])
+    plt.scatter(range(tmp.shape[0]), tmp['predicted'], color='green')
+    plt.scatter(range(tmp.shape[0]), tmp['actual'], color='blue')
+    plt.show()
+    del tmp
+
+plot_actual_predicted(Y_test,predictions)
+plt.scatter(Y_test,predictions)
+
+
+# create file
+print('Generating submission file ...')
+results = pd.DataFrame({'Predicted': predictions, 'Actual' : Y_test})
+
+
+        
+#Writting to csv
+results.to_csv('regressor.csv', index=True, header=True, index_label='id')
 
 ########################End RandomFOrest #########################
 #group_by_date.plot(kind='line', stacked=True, figsize=[15,6], colormap='winter')
